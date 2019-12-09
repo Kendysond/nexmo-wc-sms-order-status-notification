@@ -20,45 +20,16 @@
  * @subpackage Nexmo_Wc_Sms_Order_Status_Notification/public
  * @author     Douglas Kendyson <kendyson@kendyson.com>
  */
+
 class Nexmo_Wc_Sms_Order_Status_Notification_Public {
 
-	/**
-	 * The ID of this plugin.
-	 *
-	 * @since    1.0.0
-	 * @access   private
-	 * @var      string    $plugin_name    The ID of this plugin.
-	 */
-	private $plugin_name;
 	protected $nexmo_client;
-	/**
-	 * The version of this plugin.
-	 *
-	 * @since    1.0.0
-	 * @access   private
-	 * @var      string    $version    The current version of this plugin.
-	 */
-	private $version;
 
-	/**
-	 * Initialize the class and set its properties.
-	 *
-	 * @since    1.0.0
-	 * @param      string    $plugin_name       The name of the plugin.
-	 * @param      string    $version    The version of this plugin.
-	 */
+	
 	public function __construct( $plugin_name, $version ) {
 
 		$this->plugin_name = $plugin_name;
 		$this->version = $version;
-
-		add_action( 'woocommerce_order_status_pending', 'send_customer_sms_notification', 10, 1);
-		add_action( 'woocommerce_order_status_failed', 'send_customer_sms_notification', 10, 1);
-		add_action( 'woocommerce_order_status_on-hold', 'send_customer_sms_notification', 10, 1);
-		add_action( 'woocommerce_order_status_processing', 'send_customer_sms_notification', 10, 1);
-		add_action( 'woocommerce_order_status_completed', 'send_customer_sms_notification', 10, 1);
-		add_action( 'woocommerce_order_status_refunded', 'send_customer_sms_notification', 10, 1);
-		add_action( 'woocommerce_order_status_cancelled', 'send_customer_sms_notification', 10, 1);
 
 		foreach ( array( 'pending', 'failed', 'on-hold', 'processing', 'completed', 'refunded', 'cancelled' ) as $status ) {
 			add_action( 'woocommerce_order_status_' . $status, array( $this, 'send_customer_sms_notification' ) );
@@ -67,22 +38,26 @@ class Nexmo_Wc_Sms_Order_Status_Notification_Public {
 		
 	}
 
+	private $plugin_name;
+	private $version;
+
+
 	public function send_customer_sms_notification( $order_id ) {
 		$order = wc_get_order( $order_id );
-		$new_order_status = $order->get_status();
+		$order_status = $order->get_status();
 		$phone_number   = method_exists( $order, 'get_billing_phone' ) ? $order->get_billing_phone() : $order->billing_phone;
-		$message =  "Your order #".$order_id." status has been updated to ".$new_order_status;
+		$message =  "Your order #".$order_id." status has been updated to ".$order_status;
 		
 		try {
 			$message = $this->nexmo_client->message()->send([
-				'to' => $phone_number,
+				'to' => (int)$phone_number,
 				'from' => WC_SMS_ORDER_NEXMO_SENDER_NAME,
 				'text' => $message
 			]);
 			$response = $message->getResponseData();
 		
 			if($response['messages'][0]['status'] == 0) {
-				$order_note = "Customer notified on order status change to ".$new_order_status." via SMS (".$phone_number.")";
+				$order_note = "Customer notified on order status change to ".$order_status." via SMS (".$phone_number.")";
 			} else {
 				$order_note = "Unable to notify customer on order status change via SMS. Error:". $response['messages'][0]['status'];
 			}
